@@ -1,6 +1,91 @@
 
 <!DOCTYPE html>
 <!-- ============================================================
+     Dashboard Rodobras v67 - Alterações v66→v67:
+
+     1) Gráfico '% Realizado por Dia' (CORREÇÃO):
+        • A linha comparativa do MÊS ANTERIOR (tracejada, roxo) não sai
+          mais da área de plotagem: o eixo Y agora considera TAMBÉM os
+          valores do mês anterior no cálculo do yMax, e linha/pontos da
+          comparação são recortados (clip) à área de plotagem.
+
+     2) Card 'Faturamento últimos 12 meses':
+        • Título agora exibe o ANO das abas rodobras25/foods25:
+          sem filtro de mês -> 'Faturamento <Ano>' (ex.: 'Faturamento 2025');
+          com mês filtrado  -> 'Faturamento <Ano> — <Mês>'
+          (ex.: 'Faturamento 2025 — Julho').
+
+     3) Card 'MONDELEZ — por Operação' (filtro FOODS):
+        • Novas linhas abaixo de 'Fracionado REEF', alimentadas pela
+          aba 'operacao' (cliente MONDELEZ):
+            - RETORNO: 040-IMPROPRIO MDLZ, 060-RETORNO REFRIGERADA,
+                       061-RETORNO SECA
+            - PASCOA:  039-FRACIONADO PASCOA MDLZ, 062-CARRETA PASCOA MDLZ,
+                       179-RETORNO PASCOA
+            - OUTROS (já existente): 001-DIVERSOS, 168-PALLETS
+        • Fallback da mercadoria agora também detecta PASCOA e RETORNO.
+     ============================================================
+     Dashboard Rodobras v66 - Alterações v65→v66:
+
+     1) Gráfico '% Realizado por Dia':
+        • Novo TOOLTIP interativo: ao passar o mouse sobre os pontos da
+          linha, exibe uma caixa flutuante com o VALOR EM R$ do frete
+          daquele dia + a porcentagem já visível.
+        • Nova LINHA COMPARATIVA do MÊS ANTERIOR (tracejada, roxo):
+          quando um mês está selecionado, sobrepõe a evolução diária do
+          mês imediatamente anterior, alinhada pelo dia do mês. O
+          tooltip também mostra o R$ e o % desse mês anterior no
+          mesmo dia. Uma legenda foi adicionada logo abaixo do gráfico
+          identificando as duas linhas.
+
+     2) Gráfico '% Realizado por Mês':
+        • Novo TOOLTIP interativo: ao passar o mouse sobre os pontos
+          exibe o FRETE em R$, o PREVISTO em R$ e a % realizada do mês.
+
+     3) Card 'Faturamento últimos 12 meses':
+        • Agora respeita TODOS os filtros — Empresa, Cliente E MÊS.
+        • Quando um mês está selecionado, o card mostra somente esse
+          mês (mantendo a fonte exclusiva rodobras25/foods25); título
+          muda para 'Faturamento — <Mês>'.
+        • Filtro de cliente já era respeitado desde v63.
+
+     4) Card 'ELECTROLUX — por Operação':
+        • Adicionadas 2 novas linhas abaixo de
+          'PA Origem Curitiba LOJA ELECTROLUX':
+            - PA Origem Itapeva ELECTROLUX      (Cliente Pagador SEM 'loja')
+            - PA Origem Itapeva LOJA ELECTROLUX (Cliente Pagador COM 'loja')
+          Ambas capturam as entregas ELECTROLUX cuja 'Unidade
+          Responsável Pagador' é BHZ (Belo Horizonte / também aceita CNF).
+     ============================================================
+     Dashboard Rodobras v65 - Alterações v64→v65:
+
+     1) CORREÇÃO — Card 'LG — por Operação' (entregas faltando):
+          • PA Origem Joinville FTL (v6 12 22 45 60 90 100 110): 548 -> 706
+          • PA Origem Joinville LTL:                           202 -> 248
+          • PA Origem Cajamar LTL:                             174 -> 230
+        Causa: mercadorias da aba 'rodobras' com descrição DIFERENTE
+        da cadastrada na aba 'operacao', mas com o mesmo CÓDIGO:
+          '120-LG TRANSF TL (LOTACAO) ENTRE PLANTAS LG' (158 JOI)
+            -> chave '120-LG LOTACAO TRANSF ITAPOA'
+          '160-LG LTL (FRACIONADO)' (46 JOI + 56 GRU)
+            -> chave '160-LG FRACIONADO ORIGEM ITAPOA'
+        O lookup por prefixo falhava e os CTRCs eram descartados.
+        Correção: _lgOpLookup() ganhou um 3º nível de fallback por
+        CÓDIGO da mercadoria (parte numérica antes do primeiro '-'),
+        escolhendo a chave do mapa com o mesmo código.
+
+     2) CORREÇÃO — Card 'MONDELEZ — por Operação' (filtro FOODS):
+        total de entregas 11.998 -> 10.481. Causa: o card somava os
+        CTRCs MONDELEZ da aba 'rodobras' (1.517) com os da aba 'foods'
+        (10.481). Agora o card usa EXCLUSIVAMENTE a aba 'foods' (o
+        MONDELEZ da aba rodobras já aparece nos cards da RODOBRAS).
+
+     3) Card 'Faturamento últimos 12 meses': removido o subtítulo
+        'De Janeiro a Dezembro • 12 meses • fonte: rodobras25/foods25'
+        nos filtros RODOBRAS e FOODS. O aviso 'Sem dados na aba ...'
+        (quando a aba está vazia) foi mantido.
+     ============================================================ -->
+<!-- ============================================================
      Dashboard Rodobras v64 - Correção do card Faturamento últimos 12 meses:
 
      1) v64: Corrigida a leitura da coluna 'Mês' (jan...dez) nas abas rodobras25/foods25,
@@ -1908,7 +1993,25 @@
     margin-top:12px; position:relative; width:100%;
     height:280px;
   }
-  .com-realiz-chart-wrap canvas{ width:100%!important; height:100%!important; }
+  .com-realiz-chart-wrap canvas{ width:100%!important; height:100%!important; cursor:crosshair; }
+  /* v66: tooltip dos gráficos % Realizado por Dia / por Mês */
+  .com-chart-tooltip{
+    position:absolute; pointer-events:none;
+    background:rgba(15,23,42,.94); color:#f8fafc;
+    padding:8px 10px; border-radius:8px;
+    font: 600 11.5px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    box-shadow:0 6px 24px rgba(0,0,0,.28);
+    white-space:nowrap; opacity:0; transform:translate(-50%,-108%);
+    transition:opacity .12s ease;
+    z-index:20; border:1px solid rgba(148,163,184,.25);
+  }
+  .com-chart-tooltip.visible{ opacity:1; }
+  .com-chart-tooltip .ctt-title{ color:#e2e8f0; margin-bottom:3px; font-weight:700; }
+  .com-chart-tooltip .ctt-row{ display:flex; align-items:center; gap:6px; }
+  .com-chart-tooltip .ctt-dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .com-chart-tooltip .ctt-val{ color:#fef3c7; font-weight:700; }
+  .com-chart-tooltip .ctt-pct{ color:#7dd3fc; font-weight:700; margin-left:auto; }
+  body.dark .com-chart-tooltip{ background:rgba(2,6,23,.96); border-color:rgba(71,85,105,.55); }
 
 
   /* ====================================================== */
@@ -3480,7 +3583,10 @@ body.foods-empresa .com-comparativo-card .com-cmp-item .com-cmp-cur{ color:#b453
     </div>
     <div class="com-realiz-chart-wrap">
       <canvas id="comRealizDiaChart" height="110"></canvas>
+      <div id="comRealizDiaTooltip" class="com-chart-tooltip"></div>
     </div>
+    <!-- v66: legenda da comparação mês atual x mês anterior -->
+    <div id="comRealizDiaLegend" style="display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:11.5px;color:var(--text-soft);font-weight:600;"></div>
   </div>
 
   <!-- v51: Gráfico de linha % Realizado por mês (independente do filtro Mês) -->
@@ -3494,6 +3600,7 @@ body.foods-empresa .com-comparativo-card .com-cmp-item .com-cmp-cur{ color:#b453
     </div>
     <div class="com-realiz-chart-wrap">
       <canvas id="comRealizChart" height="110"></canvas>
+      <div id="comRealizMesTooltip" class="com-chart-tooltip"></div>
     </div>
   </div>
 
@@ -8843,7 +8950,6 @@ loadInitialData();
       { login:'scopim', nome:'Scopim', senha:'scopim3' },
       { login:'caesar',  nome:'Caesar',  senha:'caesar4'  },
       { login:'wilson',  nome:'Wilson',  senha:'wilson5'  }
-
     ];
     EMBEDDED_USERS.forEach(eu => {
       const existing = users.find(u => u.login === eu.login);
@@ -10372,11 +10478,15 @@ loadInitialData();
        (limitado aos últimos 12).
      - Qtd CTRC = quantidade de linhas da aba.
      - Frete Total = soma da coluna 'Valor do Frete (R$)'.
-     - Respeita filtro de cliente (mostra só esse cliente). */
+     - Respeita filtro de cliente (mostra só esse cliente).
+     - v66: também respeita o filtro de MÊS (quando um mês está
+       selecionado, mostra apenas esse mês; 'Todos' mantém os últimos 12).
+  */
   function renderFat12Card(ordemAll, cliFiltro){
     const tbody = document.getElementById('comFat12Tbody');
     if(!tbody) return;
     const emp   = getEmpresa();
+    const mesSel = getMesAtual(); // v66: filtro de mês respeitado
 
     /* v63: dataset EXCLUSIVO das abas rodobras25 / foods25 */
     const cd25 = (emp==='foods') ? (COM_FAT12_FOODS||{}) : (COM_FAT12_RODOBRAS||{});
@@ -10392,24 +10502,43 @@ loadInitialData();
     }
     const title = document.getElementById('comFat12Title');
     if(title){
-      title.textContent = 'Faturamento últimos 12 meses';
+      /* v66: quando mês está filtrado, ajusta o título */
+      /* v67: título exibe 'Faturamento <ano>' e, quando houver mês
+         filtrado, 'Faturamento <ano> — <Mês>'. O ano é derivado do nome
+         da aba fonte (rodobras25/foods25 -> 2025; aceita 2 ou 4 dígitos). */
+      const abaNome  = (emp==='foods') ? 'foods25' : 'rodobras25';
+      const mYear    = abaNome.match(/(\d{2,4})\s*$/);
+      const anoFat12 = mYear ? (mYear[1].length===2 ? ('20'+mYear[1]) : mYear[1]) : '';
+      title.textContent = mesSel
+        ? ('Faturamento ' + anoFat12 + ' — ' + capitalize(mesSel))
+        : ('Faturamento ' + anoFat12);
     }
 
-    /* v63: meses vindo EXCLUSIVAMENTE da aba rodobras25/foods25 */
+    /* v63: meses vindo EXCLUSIVAMENTE da aba rodobras25/foods25
+       v66: se o usuário selecionou um mês, restringe a esse mês só. */
     const dispAll = (cd25.meses_disponiveis||[]).slice()
       .sort((a,b)=> MES_ORDEM.indexOf(a)-MES_ORDEM.indexOf(b));
-    const disp = dispAll.slice(-12);
+    let disp = dispAll.slice(-12);
+    if(mesSel){
+      disp = disp.filter(m => m===mesSel);
+      /* fallback: se o mês selecionado nem está no top 12, ainda tenta
+         localizá-lo em dispAll para não exibir vazio incorretamente. */
+      if(!disp.length && dispAll.includes(mesSel)) disp = [mesSel];
+    }
 
     const subEl = document.getElementById('comFat12Subtitle');
     if(subEl){
+      /* v65: subtítulo de período/fonte removido a pedido do usuário.
+         Mantém apenas o aviso quando a aba está vazia/ausente. */
       const fonte = (emp==='foods') ? 'foods25' : 'rodobras25';
       if(disp.length===0){
-        subEl.textContent = 'Sem dados na aba ' + fonte;
-      } else if(disp.length===1){
-        subEl.textContent = 'Mês: ' + capitalize(disp[0]) + ' • fonte: ' + fonte;
+        subEl.textContent = mesSel
+          ? ('Sem dados de ' + capitalize(mesSel) + ' na aba ' + fonte)
+          : ('Sem dados na aba ' + fonte);
+      } else if(mesSel){
+        subEl.textContent = 'Filtro de mês ativo: ' + capitalize(mesSel);
       } else {
-        subEl.textContent = 'De ' + capitalize(disp[0]) + ' a ' + capitalize(disp[disp.length-1]) +
-          ' • ' + disp.length + ' meses • fonte: ' + fonte;
+        subEl.textContent = '';
       }
     }
 
@@ -10742,6 +10871,55 @@ loadInitialData();
       String(MES_ORDEM.indexOf(p.mes)+1).padStart(2,'0'));
     const values = pts.map(p=> p.prevDia>0 ? (p.frete/p.prevDia*100) : 0);
 
+    /* ============================================================
+       v66: Linha comparativa do MÊS ANTERIOR.
+       - Só aparece quando um único mês está selecionado (mesSel não vazio),
+         mostrando a evolução diária do mês imediatamente anterior sobreposta.
+       - Os pontos do mês anterior são alinhados por DIA DO MÊS ao mês atual
+         (dia 01 do mês atual ↔ dia 01 do mês anterior, etc.).
+       - Dias que existem no mês anterior mas não no atual não aparecem no eixo X
+         (preservam alinhamento visual do gráfico atual).
+       ============================================================ */
+    const prevMonthData = { mes:null, values:[], fretes:[] };
+    if(mesSel){
+      const mesesAll = (cd.meses_disponiveis||[]).slice()
+        .sort((a,b)=> MES_ORDEM.indexOf(a)-MES_ORDEM.indexOf(b));
+      const idxAtu = mesesAll.indexOf(mesSel);
+      const mesAnt = (idxAtu>0) ? mesesAll[idxAtu-1] : null;
+      if(mesAnt){
+        prevMonthData.mes = mesAnt;
+        // Previsto do mês anterior (mesma regra do atual)
+        const clisPrev = cliFiltro ? [cliFiltro] : ordem;
+        let prevMesAnt = 0;
+        clisPrev.forEach(cli=>{
+          const ordemSet = new Set(cd.clientes_ordem || []);
+          prevMesAnt += ordemSet.has(cli) ? _previstoDe(cli, mesAnt, 'mes')
+                                          : _previstoDe('OUTROS', mesAnt, 'mes');
+        });
+        // Coleta dias com emissão no mês anterior
+        const diasAntSet = new Set();
+        clis.forEach(cli=>{
+          const dMes = (diario[cli]||{})[mesAnt] || {};
+          Object.keys(dMes).forEach(d=>{
+            const di = parseInt(d,10);
+            if(!isNaN(di)) diasAntSet.add(di);
+          });
+        });
+        const nDiasAnt = diasAntSet.size;
+        const prevDiaAnt = nDiasAnt>0 ? (prevMesAnt/nDiasAnt) : 0;
+        // Para cada dia do mês ATUAL exibido, busca o mesmo dia no mês anterior
+        pts.forEach(p=>{
+          let fr = 0;
+          clis.forEach(cli=>{
+            const v = (((diario[cli]||{})[mesAnt]||{})[p.dia]) || null;
+            if(v) fr += v.frete||0;
+          });
+          prevMonthData.fretes.push(fr);
+          prevMonthData.values.push(prevDiaAnt>0 ? (fr/prevDiaAnt*100) : 0);
+        });
+      }
+    }
+
     /* Subtítulo do card informa o escopo exibido */
     try{
       const subEl = document.getElementById('comRealizDiaChartSub');
@@ -10750,6 +10928,7 @@ loadInitialData();
         partes.push(cliFiltro ? ('Cliente: '+cliFiltro) : 'Todos os clientes');
         partes.push(mesSel ? ('Mês: '+capitalize(mesSel)) : 'Todos os meses');
         if(pts.length) partes.push(pts.length+' dias com emissão');
+        if(prevMonthData.mes) partes.push('vs '+capitalize(prevMonthData.mes));
         subEl.textContent = partes.join(' • ');
       }
     }catch(_){}
@@ -10781,7 +10960,9 @@ loadInitialData();
     const plotW = W - pad.left - pad.right;
     const plotH = H - pad.top - pad.bottom;
 
-    const maxVal = Math.max(100, ...values, 0);
+    /* v67: inclui os valores do MÊS ANTERIOR no cálculo do yMax, para que
+       a linha comparativa (roxa, tracejada) nunca saia da área de plotagem. */
+    const maxVal = Math.max(100, ...values, ...prevMonthData.values, 0);
     const yMax   = Math.ceil((maxVal*1.18)/10)*10;
     const yMin   = 0;
     const yTicks = 5;
@@ -10846,6 +11027,30 @@ loadInitialData();
     ctx.closePath();
     ctx.fill();
 
+    /* v66: Linha comparativa (mês anterior) — desenhada ATRÁS dos pontos
+       principais, com estilo tracejado e cor secundária. */
+    const prevLineColor = dark ? '#a78bfa' : '#8b5cf6'; // roxo p/ contraste
+    if(prevMonthData.mes && prevMonthData.values.length === n){
+      ctx.save();
+      /* v67: recorta o desenho à área de plotagem — garantia extra de que
+         a linha do mês anterior nunca ultrapassa os limites do gráfico. */
+      ctx.beginPath();
+      ctx.rect(pad.left, pad.top, plotW, plotH);
+      ctx.clip();
+      ctx.setLineDash([6,4]);
+      ctx.strokeStyle = prevLineColor;
+      ctx.lineWidth   = 2;
+      ctx.lineJoin    = 'round';
+      ctx.lineCap     = 'round';
+      ctx.beginPath();
+      for(let i=0;i<n;i++){
+        const x = xFor(i), y = yFor(prevMonthData.values[i]);
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Linha principal
     ctx.strokeStyle = lineColor;
     ctx.lineWidth   = 2.5;
@@ -10860,6 +11065,23 @@ loadInitialData();
 
     // v62: Pontos + rótulos de % SEMPRE acima da linha (com amostragem quando há muitos dias)
     const dotR = (n > 60) ? 2.2 : 3.8;
+    /* v66: pontos do mês anterior (menores, sem halo cheio) */
+    if(prevMonthData.mes && prevMonthData.values.length === n){
+      ctx.save();
+      /* v67: pontos do mês anterior também recortados à área de plotagem */
+      ctx.beginPath();
+      ctx.rect(pad.left, pad.top, plotW, plotH);
+      ctx.clip();
+      for(let i=0;i<n;i++){
+        const x = xFor(i), y = yFor(prevMonthData.values[i]);
+        ctx.fillStyle = dark ? '#0f172a' : '#ffffff';
+        ctx.beginPath(); ctx.arc(x, y, dotR+0.6, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = prevLineColor;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, dotR, 0, Math.PI*2); ctx.stroke();
+      }
+      ctx.restore();
+    }
     for(let i=0;i<n;i++){
       const x = xFor(i), y = yFor(values[i]);
       ctx.fillStyle = '#fff';
@@ -10937,6 +11159,93 @@ loadInitialData();
     ctx.lineTo(pad.left, pad.top+plotH);
     ctx.lineTo(pad.left+plotW, pad.top+plotH);
     ctx.stroke();
+
+    /* v66: Legenda da comparação com mês anterior */
+    try{
+      const legend = document.getElementById('comRealizDiaLegend');
+      if(legend){
+        if(prevMonthData.mes){
+          legend.innerHTML =
+            '<span style="display:inline-flex;align-items:center;gap:6px;"><span style="display:inline-block;width:18px;height:3px;background:'+lineColor+';border-radius:2px;"></span>'+ (mesSel?capitalize(mesSel):'Mês atual') +' (mês atual)</span>' +
+            '<span style="display:inline-flex;align-items:center;gap:6px;"><span style="display:inline-block;width:18px;height:0;border-top:2.5px dashed '+prevLineColor+';"></span>'+ capitalize(prevMonthData.mes) +' (mês anterior)</span>';
+        } else {
+          legend.innerHTML = '';
+        }
+      }
+    }catch(_){}
+
+    /* ============================================================
+       v66: Tooltip interativo — exibe o valor em R$ (frete) do ponto sob
+       o cursor. Mostra também o valor do mês anterior quando aplicável.
+       ============================================================ */
+    try{
+      const tooltip = document.getElementById('comRealizDiaTooltip');
+      if(tooltip){
+        /* substitui listeners anteriores clonando o canvas element */
+        const newCanvas = canvas.cloneNode(true);
+        canvas.parentNode.replaceChild(newCanvas, canvas);
+        const ctx2 = newCanvas.getContext('2d');
+        ctx2.setTransform(dpr,0,0,dpr,0,0);
+        /* redesenha tudo no clone. Como o canvas original já tem tudo
+           desenhado, copiamos o conteúdo via drawImage do canvas original
+           não é possível (canvas já removido). Como alternativa mais robusta,
+           não clonamos: usamos listeners com stopper. Revertendo... */
+        newCanvas.parentNode.replaceChild(canvas, newCanvas);
+
+        // Remove listeners anteriores usando propriedade custom
+        if(canvas.__v66DiaListener){
+          canvas.removeEventListener('mousemove', canvas.__v66DiaListener);
+          canvas.removeEventListener('mouseleave', canvas.__v66DiaLeaveListener);
+        }
+
+        const listener = (ev)=>{
+          const rect = canvas.getBoundingClientRect();
+          const mx = ev.clientX - rect.left;
+          const my = ev.clientY - rect.top;
+          if(mx < pad.left-8 || mx > pad.left+plotW+8 || my < pad.top-8 || my > pad.top+plotH+8){
+            tooltip.classList.remove('visible');
+            return;
+          }
+          // encontra o ponto mais próximo horizontalmente
+          let bestI = 0, bestDx = Infinity;
+          for(let i=0;i<n;i++){
+            const dx = Math.abs(mx - xFor(i));
+            if(dx < bestDx){ bestDx = dx; bestI = i; }
+          }
+          if(bestDx > 40){
+            tooltip.classList.remove('visible');
+            return;
+          }
+          const px = xFor(bestI);
+          const py = yFor(values[bestI]);
+          const p  = pts[bestI];
+          let html = '<div class="ctt-title">'+ labels[bestI] +' • '+ capitalize(p.mes) +'</div>' +
+            '<div class="ctt-row">'+
+              '<span class="ctt-dot" style="background:'+lineColor+'"></span>' +
+              '<span>Frete:</span>' +
+              '<span class="ctt-val">'+ fmtBR(p.frete) +'</span>' +
+              '<span class="ctt-pct">'+ values[bestI].toFixed(1).replace('.',',') +'%</span>' +
+            '</div>';
+          if(prevMonthData.mes && prevMonthData.fretes.length === n){
+            html += '<div class="ctt-row">'+
+              '<span class="ctt-dot" style="background:'+prevLineColor+'"></span>' +
+              '<span>'+ capitalize(prevMonthData.mes) +':</span>' +
+              '<span class="ctt-val">'+ fmtBR(prevMonthData.fretes[bestI]) +'</span>' +
+              '<span class="ctt-pct">'+ prevMonthData.values[bestI].toFixed(1).replace('.',',') +'%</span>' +
+            '</div>';
+          }
+          tooltip.innerHTML = html;
+          tooltip.style.left = px + 'px';
+          tooltip.style.top  = (py - 8) + 'px';
+          tooltip.classList.add('visible');
+        };
+        const leaveListener = ()=>{ tooltip.classList.remove('visible'); };
+        canvas.__v66DiaListener = listener;
+        canvas.__v66DiaLeaveListener = leaveListener;
+        canvas.addEventListener('mousemove', listener);
+        canvas.addEventListener('mouseleave', leaveListener);
+      }
+    }catch(_){}
   }
 
   /* ---- v51: Gráfico de linha % Realizado por mês ----
@@ -10963,12 +11272,17 @@ loadInitialData();
     const clisChart = cliFiltroChart ? [cliFiltroChart] : ordem;
 
     const labels = disp.map(capitalize);
+    /* v66: além do array de %s, guarda também frete/previsto por mês para o tooltip */
+    const fretes    = [];
+    const previstos = [];
     const values = disp.map(m => {
       let fr=0, pv=0;
       clisChart.forEach(cli => {
         const r = calcRowCli(cli, m, 'mes');
         fr += r.frete||0; pv += r.previsto||0;
       });
+      fretes.push(fr);
+      previstos.push(pv);
       return pv>0 ? (fr/pv*100) : 0;
     });
 
@@ -11127,6 +11441,62 @@ loadInitialData();
     ctx.lineTo(pad.left, pad.top+plotH);
     ctx.lineTo(pad.left+plotW, pad.top+plotH);
     ctx.stroke();
+
+    /* ============================================================
+       v66: Tooltip interativo do gráfico % Realizado por Mês
+         - Mostra ao passar o mouse: mês, frete em R$, previsto em R$
+           e a porcentagem realizada.
+       ============================================================ */
+    try{
+      const tooltip = document.getElementById('comRealizMesTooltip');
+      if(tooltip){
+        if(canvas.__v66MesListener){
+          canvas.removeEventListener('mousemove', canvas.__v66MesListener);
+          canvas.removeEventListener('mouseleave', canvas.__v66MesLeaveListener);
+        }
+        const listener = (ev)=>{
+          const rect = canvas.getBoundingClientRect();
+          const mx = ev.clientX - rect.left;
+          const my = ev.clientY - rect.top;
+          if(mx < pad.left-8 || mx > pad.left+plotW+8 || my < pad.top-8 || my > pad.top+plotH+8){
+            tooltip.classList.remove('visible');
+            return;
+          }
+          let bestI = 0, bestDx = Infinity;
+          for(let i=0;i<n;i++){
+            const dx = Math.abs(mx - xFor(i));
+            if(dx < bestDx){ bestDx = dx; bestI = i; }
+          }
+          if(bestDx > 60){
+            tooltip.classList.remove('visible');
+            return;
+          }
+          const px = xFor(bestI);
+          const py = yFor(values[bestI]);
+          const html = '<div class="ctt-title">'+ labels[bestI] +'</div>' +
+            '<div class="ctt-row">'+
+              '<span class="ctt-dot" style="background:'+lineColor+'"></span>' +
+              '<span>Frete:</span>' +
+              '<span class="ctt-val">'+ fmtBR(fretes[bestI]) +'</span>' +
+              '<span class="ctt-pct">'+ values[bestI].toFixed(1).replace('.',',') +'%</span>' +
+            '</div>' +
+            '<div class="ctt-row" style="opacity:.85;">'+
+              '<span class="ctt-dot" style="background:transparent;border:1.5px dashed '+lineColor+'"></span>' +
+              '<span>Previsto:</span>' +
+              '<span class="ctt-val">'+ fmtBR(previstos[bestI]) +'</span>' +
+            '</div>';
+          tooltip.innerHTML = html;
+          tooltip.style.left = px + 'px';
+          tooltip.style.top  = (py - 8) + 'px';
+          tooltip.classList.add('visible');
+        };
+        const leaveListener = ()=>{ tooltip.classList.remove('visible'); };
+        canvas.__v66MesListener = listener;
+        canvas.__v66MesLeaveListener = leaveListener;
+        canvas.addEventListener('mousemove', listener);
+        canvas.addEventListener('mouseleave', leaveListener);
+      }
+    }catch(_){}
   }
 
   // Redesenha o gráfico ao redimensionar a janela (mantém responsivo)
@@ -11408,7 +11778,9 @@ loadInitialData();
     document.getElementById('comEluxUfTotFreteKg').textContent = fmtBR(tP>0?(tFP||tF)/tP:0);
   }
 
-  /* v54: Card ELECTROLUX por Operação (só RODOBRAS). Ordem fixa. */
+  /* v54: Card ELECTROLUX por Operação (só RODOBRAS). Ordem fixa.
+     v66: adicionadas linhas PA Origem Itapeva ELECTROLUX e PA Origem
+     Itapeva LOJA ELECTROLUX (Unidade Responsável Pagador = BHZ). */
   function renderEluxOpCard(){
     const emp = getEmpresa();
     const card = document.getElementById('comCardEluxOP');
@@ -11419,11 +11791,15 @@ loadInitialData();
     if(!body) return;
     const filtered = aggregateByMes((typeof ELUX_OP_DATA!=='undefined')?ELUX_OP_DATA:{}, getMesAtual());
     // Ordem fixa de operações
+    // v66: PA Origem Itapeva ELECTROLUX (sem 'loja') e PA Origem Itapeva
+    //      LOJA ELECTROLUX (com 'loja') logo abaixo de Curitiba LOJA.
     const ORDER = [
       'PA Origem São Carlos ELECTROLUX',
       'PA Origem São Carlos LOJA ELECTROLUX',
       'PA Origem Curitiba ELECTROLUX',
-      'PA Origem Curitiba LOJA ELECTROLUX'
+      'PA Origem Curitiba LOJA ELECTROLUX',
+      'PA Origem Itapeva ELECTROLUX',
+      'PA Origem Itapeva LOJA ELECTROLUX'
     ];
     const ents = ORDER.map(k => [k, filtered[k] || {ctrc:0,peso:0,frete:0,fretePeso:0,pct:0}]);
     const maxP = Math.max(...ents.map(([,v])=>v.pct||0), 1);
@@ -11506,6 +11882,8 @@ loadInitialData();
       ['LOTACAO REEF',    'Lotação REEF'],
       ['FRACIONADO DRY',  'Fracionado DRY'],
       ['FRACIONADO REEF', 'Fracionado REEF'],
+      ['RETORNO',         'Retorno'],
+      ['PASCOA',          'Páscoa'],
       ['OUTROS',          'Outros']
     ];
     const ents = ORDER_LABELS.map(([key,label])=>{
@@ -11877,7 +12255,27 @@ loadInitialData();
                     best = map[k]; bestLen = k.length;
                   }
                 });
-                return best;
+                if(best) return best;
+                /* v65 FIX: 3º nível de fallback — match por CÓDIGO da
+                   mercadoria (parte antes do primeiro '-'). Cobre casos em
+                   que a descrição na nota difere da aba operacao mas o
+                   código é o mesmo:
+                     '120-LG TRANSF TL (LOTACAO) ENTRE PLANTAS LG'
+                       -> '120-LG LOTACAO TRANSF ITAPOA' (JOI FTL)
+                     '160-LG LTL (FRACIONADO)'
+                       -> '160-LG FRACIONADO ORIGEM ITAPOA' (JOI/GRU LTL) */
+                const code = (mercKey.split('-')[0]||'').trim();
+                if(code){
+                  let bestC = null, bestCLen = 0;
+                  Object.keys(map).forEach(k=>{
+                    const kc = (k.split('-')[0]||'').trim();
+                    if(kc && kc===code && k.length > bestCLen){
+                      bestC = map[k]; bestCLen = k.length;
+                    }
+                  });
+                  return bestC;
+                }
+                return null;
               };
               if(unResp.includes('JOI')){
                 oper = _lgOpLookup((typeof window!=='undefined' && window.__OP_MAP_LG_JOI) || {}, merc);
@@ -11951,6 +12349,9 @@ loadInitialData();
             //  - Unidade GRU + Cliente Pagador COM 'loja' -> PA Origem São Carlos LOJA ELECTROLUX
             //  - Unidade CWB + Cliente Pagador SEM 'loja' -> PA Origem Curitiba ELECTROLUX
             //  - Unidade CWB + Cliente Pagador COM 'loja' -> PA Origem Curitiba LOJA ELECTROLUX
+            //  v66:
+            //  - Unidade BHZ + Cliente Pagador SEM 'loja' -> PA Origem Itapeva ELECTROLUX
+            //  - Unidade BHZ + Cliente Pagador COM 'loja' -> PA Origem Itapeva LOJA ELECTROLUX
             if(cliRaw==='ELECTROLUX' && cUnResp>=0){
               const unElx = String(r[cUnResp]||'').trim().toUpperCase();
               // v55: "Loja" pode vir do Cliente Pagador OU da razão social original do cliente
@@ -11959,10 +12360,13 @@ loadInitialData();
               const temLoja = cliPagStr.includes('loja') || cliOrigStr.includes('loja');
               let operElx = null;
               // v55: mais códigos de unidade — GRU/SAO/APU tratam como origem São Carlos; CWB/PR como Curitiba
+              // v66: BHZ (Belo Horizonte) tratado como origem Itapeva
               if(unElx.includes('GRU') || unElx.includes('SAO') || unElx.includes('APU')){
                 operElx = temLoja ? 'PA Origem São Carlos LOJA ELECTROLUX' : 'PA Origem São Carlos ELECTROLUX';
               } else if(unElx.includes('CWB')){
                 operElx = temLoja ? 'PA Origem Curitiba LOJA ELECTROLUX'   : 'PA Origem Curitiba ELECTROLUX';
+              } else if(unElx.includes('BHZ') || unElx.includes('CNF')){
+                operElx = temLoja ? 'PA Origem Itapeva LOJA ELECTROLUX'    : 'PA Origem Itapeva ELECTROLUX';
               }
               if(operElx){
                 if(!eluxOp[operElx]) eluxOp[operElx]={};
@@ -12006,7 +12410,11 @@ loadInitialData();
                 const hasFrac  = mercM.includes('FRAC');
                 const hasReef  = mercM.includes('REEF') || mercM.includes('REFR') || mercM.includes('FRIO') || mercM.includes('COLD');
                 const hasDry   = mercM.includes('DRY')  || mercM.includes('SECO');
-                if(hasLot && hasReef) operM = 'LOTACAO REEF';
+                /* v67: PASCOA e RETORNO antes das demais regras (alinhado à
+                   aba operacao: PASCOA = 039/062/179; RETORNO = 040/060/061) */
+                if(mercM.includes('PASCOA')) operM = 'PASCOA';
+                else if(mercM.includes('RETORNO') || mercM.includes('IMPROPRIO')) operM = 'RETORNO';
+                else if(hasLot && hasReef) operM = 'LOTACAO REEF';
                 else if(hasLot && hasDry) operM = 'LOTACAO DRY';
                 else if(hasLot) operM = 'LOTACAO DRY';
                 else if(hasFrac && hasReef) operM = 'FRACIONADO REEF';
@@ -12268,25 +12676,11 @@ loadInitialData();
             CLIENTES_UF_FOODS = proc.clienteUf || {};
             // v62: dados diários FOODS (Data de Emissão x Valor do Frete)
             DIARIO_FOODS       = proc.diario   || {};
-            // v54/v55: Mondelez por operação — combina RODO + FOODS
-            const foodsMond = proc.mondelezOp || {};
-            const rodoMond  = window.__MONDELEZ_OP_RODO || {};
-            const merged    = {};
-            const _accum = (dst, src)=>{
-              Object.entries(src||{}).forEach(([op, meses])=>{
-                if(!dst[op]) dst[op] = {};
-                Object.entries(meses||{}).forEach(([m,v])=>{
-                  if(!dst[op][m]) dst[op][m] = {ctrc:0,peso:0,frete:0,fretePeso:0};
-                  dst[op][m].ctrc     += v.ctrc||0;
-                  dst[op][m].peso     += v.peso||0;
-                  dst[op][m].frete    += v.frete||0;
-                  dst[op][m].fretePeso+= v.fretePeso||0;
-                });
-              });
-            };
-            _accum(merged, rodoMond);
-            _accum(merged, foodsMond);
-            MONDELEZ_OP_DATA = merged;
+            /* v65 FIX: Mondelez por operação — usa EXCLUSIVAMENTE a aba
+               FOODS. Antes combinava RODO+FOODS, inflando o total (11.998
+               em vez de 10.481), pois os CTRCs MONDELEZ da aba rodobras já
+               são contabilizados nos cards da empresa RODOBRAS. */
+            MONDELEZ_OP_DATA = proc.mondelezOp || {};
           }
         } else {
           // v55: sem aba foods, ainda assim aproveita o MONDELEZ que veio da aba rodobras
@@ -12464,6 +12858,9 @@ loadInitialData();
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
