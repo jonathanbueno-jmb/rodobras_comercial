@@ -12880,82 +12880,80 @@ loadInitialData();
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
-// ============================================================
-// AUTO-CARREGAMENTO DO ARQUIVO DE DADOS (RODOBD18.xlsb)
-// ============================================================
+<script>
+// ================================================================
+// AUTO-CARREGAMENTO DA PLANILHA COMERCIAL (comercial.xlsx)
+// ================================================================
 
-// Caminho relativo: mesmo repositório, mesma origem, sem CORS.
-// Ajuste se a estrutura de pastas do seu repo for diferente.
-const URL_DADOS = './comercial.xlsb';
+const COM_ARQUIVO = {
+  url:  './comercial.xlsb',
+  nome: 'comercial.xlsb',
+  tipo: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+};
 
-// Mude esta string TODA VEZ que você atualizar o arquivo no GitHub.
-// Isso força o navegador a baixar a versão nova em vez de usar cache.
-const VERSAO_DADOS = '2026-09-01';
+// ⚠️ ATUALIZE ESTA STRING toda vez que fizer "git push" de um
+// comercial.xlsx novo — isso força o navegador a baixar a versão
+// atualizada em vez de usar uma cópia em cache.
+const COM_VERSAO = '2026-09-01';
 
-async function autoCarregarDados() {
-  const fileInput = document.getElementById('fileInput');
+async function autoCarregarComercial() {
+  const fileInput = document.getElementById('comFileInput');
   if (!fileInput) {
-    console.warn('[AutoLoad] #fileInput não encontrado na página.');
+    console.warn('[AutoLoad Comercial] #comFileInput não encontrado na página.');
     return;
   }
 
-  // Reaproveita o overlay que sua dashboard já usa na importação manual
-  const overlay = document.getElementById('overlay');
-  const overlayText = document.getElementById('overlayText');
-  if (overlay) overlay.classList.add('show');
-  if (overlayText) overlayText.textContent = 'Baixando dados atualizados...';
+  const overlay    = document.getElementById('overlay');
+  const overlayTxt = document.getElementById('overlayText');
+  if (overlay)    overlay.classList.add('show');
+  if (overlayTxt) overlayTxt.textContent = 'Baixando dados comerciais (~84MB)...';
 
   try {
-    console.log('[AutoLoad] Buscando:', URL_DADOS);
+    console.log('[AutoLoad Comercial] Iniciando download:', COM_ARQUIVO.url);
 
-    const resposta = await fetch(`${URL_DADOS}?v=${VERSAO_DADOS}`);
+    const resposta = await fetch(`${COM_ARQUIVO.url}?v=${COM_VERSAO}`);
     if (!resposta.ok) {
       throw new Error(
         `Arquivo não encontrado (HTTP ${resposta.status}). ` +
-        `Verifique o caminho e se o nome está com a caixa (maiúsculas/minúsculas) correta.`
+        `Verifique se "${COM_ARQUIVO.nome}" está na raiz do repositório e se o nome está com a caixa correta.`
       );
     }
 
+    if (overlayTxt) overlayTxt.textContent = 'Lendo arquivo comercial...';
     const blob = await resposta.blob();
 
-    // Cria um "arquivo virtual" idêntico ao que o usuário selecionaria manualmente
-    const arquivoVirtual = new File(
-      [blob],
-      'comercial.xlsb',
-      { type: 'application/vnd.ms-excel.sheet.binary.macroEnabled.12' }
-    );
+    // Monta o "arquivo virtual" idêntico ao que o usuário selecionaria manualmente
+    const arquivoVirtual = new File([blob], COM_ARQUIVO.nome, { type: COM_ARQUIVO.tipo });
 
-    // Insere esse arquivo no input escondido da sua dashboard
-    const dataTransfer = new DataTransfer();
-    dataTransfer.items.add(arquivoVirtual);
-    fileInput.files = dataTransfer.files;
+    // Entrega ao input escondido — o pipeline já existente (setupImporter/change)
+    // processa normalmente, sem precisar de nenhuma alteração
+    const dt = new DataTransfer();
+    dt.items.add(arquivoVirtual);
+    fileInput.files = dt.files;
 
-    // Dispara o MESMO evento que a importação manual já dispara hoje —
-    // todo o pipeline existente (SheetJS, mapeamento de colunas, pako,
-    // IndexedDB, render) roda exatamente como já roda, sem duplicação.
+    // Dispara o MESMO evento que o clique manual em "Importar XLSB" dispara
     fileInput.dispatchEvent(new Event('change', { bubbles: true }));
 
-    console.log('[AutoLoad] Arquivo entregue ao pipeline de importação existente.');
+    console.log('[AutoLoad Comercial] Arquivo entregue ao pipeline. Tamanho:', blob.size, 'bytes');
 
   } catch (erro) {
-    console.error('[AutoLoad] Falha no auto-carregamento:', erro);
+    console.error('[AutoLoad Comercial] Falha:', erro);
     if (overlay) overlay.classList.remove('show');
 
-    // Usa o sistema de toast que sua dashboard já possui, como aviso não-bloqueante
     const toast = document.getElementById('toast');
     if (toast) {
-      toast.textContent = '⚠️ Não foi possível baixar os dados automaticamente. Use o botão Importar.';
+      toast.textContent = '⚠️ Não foi possível carregar os dados comerciais automaticamente. Use o botão "Importar XLSB".';
       toast.className = 'toast error show';
-      setTimeout(() => toast.classList.remove('show'), 6000);
+      setTimeout(() => toast.classList.remove('show'), 8000);
     }
   }
 }
 
-// Pequeno atraso após o DOM carregar, garantindo que o listener do
-// #fileInput já foi registrado pelo código principal da dashboard
-// antes de dispararmos o evento 'change' programaticamente.
+// Aguarda o DOM e os scripts principais da dashboard carregarem
+// (o setTimeout garante que setupImporter() já registrou o listener
+// no #comFileInput antes de dispararmos o 'change')
 window.addEventListener('DOMContentLoaded', () => {
-  setTimeout(autoCarregarDados, 1000);
+  setTimeout(autoCarregarComercial, 1500);
 });
 </script>
 
