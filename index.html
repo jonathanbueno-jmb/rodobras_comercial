@@ -12894,7 +12894,7 @@ const COM_ARQUIVO = {
 // ⚠️ ATUALIZE ESTA STRING toda vez que fizer "git push" de um
 // comercial.xlsx novo — isso força o navegador a baixar a versão
 // atualizada em vez de usar uma cópia em cache.
-const COM_VERSAO = '2026-09-01';
+const COM_VERSAO = '2026-09-02';
 
 async function autoCarregarComercial() {
   const fileInput = document.getElementById('comFileInput');
@@ -12906,7 +12906,7 @@ async function autoCarregarComercial() {
   const overlay    = document.getElementById('overlay');
   const overlayTxt = document.getElementById('overlayText');
   if (overlay)    overlay.classList.add('show');
-  if (overlayTxt) overlayTxt.textContent = 'Baixando dados comerciais (~84MB)...';
+  if (overlayTxt) overlayTxt.textContent = 'Baixando dados comerciais...';
 
   try {
     console.log('[AutoLoad Comercial] Iniciando download:', COM_ARQUIVO.url);
