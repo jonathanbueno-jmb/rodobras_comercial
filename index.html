@@ -1,7 +1,16 @@
 
 <!DOCTYPE html>
 <!-- ============================================================
-     Dashboard Rodobras v69 - Alterações v68→v69:
+     Dashboard Rodobras v70 - Alterações v69→v70:
+
+     1) Novo botão ATUALIZAR (ícone) à esquerda do Exportar. Ao clicar,
+        recarrega a página (F5) e em seguida baixa o comercial.xlsb
+        atualizado (sem cache).
+     2) A dashboard NÃO baixa mais os dados automaticamente ao abrir:
+        exibe os dados já salvos (IndexedDB/localStorage) e só atualiza
+        após o clique no botão Atualizar.
+
+     Histórico v68→v69:
 
      1) CORREÇÃO — dashboard travada em 'Lendo arquivo comercial...':
         o overlay global (#overlay) era ABERTO pelo auto-carregamento
@@ -2540,6 +2549,7 @@ body.foods-empresa .com-comparativo-card .com-cmp-item .com-cmp-cur{ color:#b453
 #comCardMondelezOP{ order: 60; }
 
 </style>
+<style>#refreshBtn{display:inline-flex;align-items:center;justify-content:center}#refreshBtn.spinning svg{animation:rbSpin .8s linear infinite}@keyframes rbSpin{to{transform:rotate(360deg)}}#refreshBtn:disabled{opacity:.7;cursor:progress}</style>
 </head>
 <body>
 
@@ -2610,6 +2620,7 @@ body.foods-empresa .com-comparativo-card .com-cmp-item .com-cmp-cur{ color:#b453
   <div class="top-actions">
     <span class="status-pill" id="recCount"><span class="dot"></span> Carregando...</span>
     <input type="file" id="fileInput" accept=".xlsb,.xlsx,.xls,.json,application/json" style="display:none"/>
+    <button class="btn ghost" id="refreshBtn" title="Atualizar: recarrega a página (F5) e baixa os dados mais recentes" aria-label="Atualizar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg></button>
     <button class="btn ghost" id="exportBtn" title="Exportar relatório (Excel, PDF ou JSON)">Exportar</button>
     <button class="btn ghost" id="importBtn" title="Importar arquivo Excel (xlsx/xlsb/xls) ou JSON">Importar</button>
     <button class="btn hamburger" id="menuBtn" title="Menu" aria-label="Abrir menu">
@@ -13004,7 +13015,7 @@ async function autoCarregarComercial() {
   try {
     console.log('[AutoLoad Comercial] Iniciando download:', COM_ARQUIVO.url);
 
-    const resposta = await fetch(`${COM_ARQUIVO.url}?v=${COM_VERSAO}`);
+    const resposta = await fetch(`${COM_ARQUIVO.url}?v=${COM_VERSAO}&t=${Date.now()}`, { cache: 'no-store' });
     if (!resposta.ok) {
       throw new Error(
         `Arquivo não encontrado (HTTP ${resposta.status}). ` +
@@ -13047,11 +13058,45 @@ async function autoCarregarComercial() {
 // Aguarda o DOM e os scripts principais da dashboard carregarem
 // (o setTimeout garante que setupImporter() já registrou o listener
 // no #comFileInput antes de dispararmos o 'change')
+// v70: NÃO carrega mais automaticamente ao abrir a dashboard.
+// Os dados só são baixados após o clique no botão ATUALIZAR: o botão
+// grava uma flag no sessionStorage e recarrega a página (F5); depois
+// do recarregamento a flag é lida aqui e o download é disparado.
+// Abertura normal (ou F5 pelo teclado) usa os dados já salvos.
+const RB_REFRESH_FLAG = 'rb_com_refresh_pending';
 window.addEventListener('DOMContentLoaded', () => {
+  let pendente = false;
+  try { pendente = sessionStorage.getItem(RB_REFRESH_FLAG) === '1'; } catch(_) {}
+  if (!pendente) return;
+  try { sessionStorage.removeItem(RB_REFRESH_FLAG); } catch(_) {}
   setTimeout(autoCarregarComercial, 1500);
 });
+
+// v70: botão ATUALIZAR (ícone, à esquerda do Exportar) = F5 + atualização dos dados
+(function(){
+  function bind(){
+    const btn = document.getElementById('refreshBtn');
+    if (!btn || btn.__bound) return;
+    btn.__bound = true;
+    btn.addEventListener('click', () => {
+      if (btn.__busy) return;
+      btn.__busy = true;
+      btn.disabled = true;
+      btn.classList.add('spinning');
+      try { sessionStorage.setItem(RB_REFRESH_FLAG, '1'); } catch(_) {}
+      const ov = document.getElementById('overlay');
+      const ovt = document.getElementById('overlayText');
+      if (ov) ov.classList.add('show');
+      if (ovt) ovt.textContent = 'Atualizando dashboard...';
+      setTimeout(() => { location.reload(); }, 150);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
+  else bind();
+})();
 </script>
 
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 </body>
