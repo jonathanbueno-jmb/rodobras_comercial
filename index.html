@@ -1,7 +1,17 @@
 
 <!DOCTYPE html>
 <!-- ============================================================
-     Dashboard Rodobras v70 - Alterações v69→v70:
+     Dashboard Rodobras v71 - Alterações v70→v71:
+
+     1) Tag de registros (ao lado do botão Atualizar) passa a mostrar
+        "N registros • Atualizado em dd/mm/aaaa às hh:mm", onde a data
+        é a data em que o ARQUIVO DE IMPORTAÇÃO foi salvo:
+        • Importar manual: data de modificação do arquivo escolhido.
+        • Botão Atualizar: constante COM_DATA_ARQUIVO (se preenchida)
+          ou o cabeçalho Last-Modified do servidor.
+        A data fica gravada no localStorage e aparece ao reabrir a dash.
+
+     Histórico v69→v70:
 
      1) Novo botão ATUALIZAR (ícone) à esquerda do Exportar. Ao clicar,
         recarrega a página (F5) e em seguida baixa o comercial.xlsb
@@ -2550,6 +2560,7 @@ body.foods-empresa .com-comparativo-card .com-cmp-item .com-cmp-cur{ color:#b453
 
 </style>
 <style>#refreshBtn{display:inline-flex;align-items:center;justify-content:center}#refreshBtn.spinning svg{animation:rbSpin .8s linear infinite}@keyframes rbSpin{to{transform:rotate(360deg)}}#refreshBtn:disabled{opacity:.7;cursor:progress}</style>
+<style>#recCount{white-space:nowrap}#recCount .rec-sep{opacity:.6}</style>
 </head>
 <body>
 
@@ -2618,7 +2629,7 @@ body.foods-empresa .com-comparativo-card .com-cmp-item .com-cmp-cur{ color:#b453
     </div>
   </div>
   <div class="top-actions">
-    <span class="status-pill" id="recCount"><span class="dot"></span> Carregando...</span>
+    <span class="status-pill" id="recCount" title="Total de registros e data do arquivo de importação"><span class="dot"></span> Carregando...</span>
     <input type="file" id="fileInput" accept=".xlsb,.xlsx,.xls,.json,application/json" style="display:none"/>
     <button class="btn ghost" id="refreshBtn" title="Atualizar: recarrega a página (F5) e baixa os dados mais recentes" aria-label="Atualizar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg></button>
     <button class="btn ghost" id="exportBtn" title="Exportar relatório (Excel, PDF ou JSON)">Exportar</button>
@@ -4345,8 +4356,56 @@ function applyFilter(rows, f){
 function populateFilters(){
   // Inicial: usa o dataset completo para preencher tudo
   refreshFilterOptions(true);
-  document.getElementById('recCount').innerHTML = '<span class="dot"></span> '+fmt(DATA.length)+' registros';
+  try { window.__rbRecTotal = DATA.length; } catch(_){}
+  if (typeof window.__rbUpdateRecCount === 'function') window.__rbUpdateRecCount();
+  else document.getElementById('recCount').innerHTML = '<span class="dot"></span> '+fmt(DATA.length)+' registros';
 }
+
+/* v71: TAG DE REGISTROS — "N registros • Atualizado em dd/mm/aaaa às hh:mm"
+   A data exibida é a data em que o ARQUIVO DE IMPORTAÇÃO foi salvo
+   (data de modificação do arquivo), e não a hora em que foi importado.
+   - Importação manual: File.lastModified do arquivo escolhido.
+   - Botão Atualizar (download do servidor): constante COM_DATA_ARQUIVO,
+     se preenchida; senão o cabeçalho HTTP Last-Modified do servidor.
+   A data fica salva no localStorage e é exibida sempre que a dash abre. */
+(function(){
+  const KEY = 'rb_import_file_ts';
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function fmtData(ts){
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '';
+    return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' às '+pad(d.getHours())+':'+pad(d.getMinutes());
+  }
+  window.__rbSetImportFileDate = function(ts){
+    const n = Number(ts);
+    if (!n || isNaN(n)) return;
+    try { localStorage.setItem(KEY, String(n)); } catch(_){}
+    window.__rbUpdateRecCount();
+  };
+  window.__rbUpdateRecCount = function(){
+    const el = document.getElementById('recCount');
+    if (!el) return;
+    const total = (typeof window.__rbRecTotal === 'number') ? window.__rbRecTotal : null;
+    let ts = null;
+    try { ts = localStorage.getItem(KEY); } catch(_){}
+    const dataTxt = ts ? fmtData(Number(ts)) : '';
+    let html = '<span class="dot"></span> ';
+    html += (total !== null ? (typeof fmt === 'function' ? fmt(total) : total)+' registros' : 'Carregando...');
+    if (dataTxt) html += ' <span class="rec-sep">•</span> Atualizado em '+dataTxt;
+    el.innerHTML = html;
+    el.title = dataTxt
+      ? 'Total de registros • Arquivo de importação salvo em '+dataTxt
+      : 'Total de registros (nenhum arquivo importado ainda)';
+  };
+  // Captura a data do arquivo em QUALQUER importação (manual ou automática),
+  // antes dos handlers existentes — não altera o pipeline de importação.
+  document.addEventListener('change', function(e){
+    const t = e.target;
+    if (!t || (t.id !== 'fileInput' && t.id !== 'comFileInput')) return;
+    const f = t.files && t.files[0];
+    if (f && f.lastModified) window.__rbSetImportFileDate(f.lastModified);
+  }, true);
+})();
 
 function refreshFilterOptions(initial=false){
   const f = currentFilter();
@@ -12976,6 +13035,14 @@ const COM_ARQUIVO = {
 // atualizada em vez de usar uma cópia em cache.
 const COM_VERSAO = '2026-09-23';
 
+// v71: (OPCIONAL) data/hora em que o comercial.xlsb foi SALVO.
+// É o que aparece na tag de registros como "Atualizado em ...".
+// Se ficar vazia (''), usa o cabeçalho Last-Modified do servidor — no
+// GitHub Pages ele costuma trazer a data do deploy (push), não a do
+// arquivo. Para exibir a data exata, preencha junto com COM_VERSAO.
+// Formatos: 'AAAA-MM-DD HH:MM', 'AAAA-MM-DDTHH:MM' ou 'AAAA-MM-DD'.
+const COM_DATA_ARQUIVO = '';
+
 async function autoCarregarComercial() {
   const fileInput = document.getElementById('comFileInput');
   if (!fileInput) {
@@ -13027,7 +13094,21 @@ async function autoCarregarComercial() {
     const blob = await resposta.blob();
 
     // Monta o "arquivo virtual" idêntico ao que o usuário selecionaria manualmente
-    const arquivoVirtual = new File([blob], COM_ARQUIVO.nome, { type: COM_ARQUIVO.tipo });
+    // v71: data em que o arquivo foi SALVO (vai para a tag de registros)
+    let tsArquivo = Date.now();
+    try {
+      const m = String(typeof COM_DATA_ARQUIVO === 'string' ? COM_DATA_ARQUIVO : '').trim()
+        .match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
+      if (m) {
+        const d = new Date(+m[1], +m[2]-1, +m[3], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0, 0);
+        if (!isNaN(d.getTime())) tsArquivo = d.getTime();
+      } else {
+        const lm = resposta.headers.get('Last-Modified');
+        if (lm) { const d = new Date(lm); if (!isNaN(d.getTime())) tsArquivo = d.getTime(); }
+      }
+    } catch(_) {}
+
+    const arquivoVirtual = new File([blob], COM_ARQUIVO.nome, { type: COM_ARQUIVO.tipo, lastModified: tsArquivo });
 
     // Entrega ao input escondido — o pipeline já existente (setupImporter/change)
     // processa normalmente, sem precisar de nenhuma alteração
@@ -13096,6 +13177,7 @@ window.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
