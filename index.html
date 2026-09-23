@@ -1,7 +1,14 @@
 
 <!DOCTYPE html>
 <!-- ============================================================
-     Dashboard Rodobras v71 - Alterações v70→v71:
+     Dashboard Rodobras v72 - Alterações v71→v72:
+
+     1) Tag ao lado do botão Atualizar: agora mostra SOMENTE
+        "Atualizado em dd/mm/aaaa" (removidos o total de registros e
+        a hora). A data continua sendo a data em que o arquivo de
+        importação foi salvo.
+
+     Histórico v70→v71:
 
      1) Tag de registros (ao lado do botão Atualizar) passa a mostrar
         "N registros • Atualizado em dd/mm/aaaa às hh:mm", onde a data
@@ -2629,7 +2636,7 @@ body.foods-empresa .com-comparativo-card .com-cmp-item .com-cmp-cur{ color:#b453
     </div>
   </div>
   <div class="top-actions">
-    <span class="status-pill" id="recCount" title="Total de registros e data do arquivo de importação"><span class="dot"></span> Carregando...</span>
+    <span class="status-pill" id="recCount" title="Data do arquivo de importação"><span class="dot"></span> Atualizado em —</span>
     <input type="file" id="fileInput" accept=".xlsb,.xlsx,.xls,.json,application/json" style="display:none"/>
     <button class="btn ghost" id="refreshBtn" title="Atualizar: recarrega a página (F5) e baixa os dados mais recentes" aria-label="Atualizar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg></button>
     <button class="btn ghost" id="exportBtn" title="Exportar relatório (Excel, PDF ou JSON)">Exportar</button>
@@ -4358,7 +4365,7 @@ function populateFilters(){
   refreshFilterOptions(true);
   try { window.__rbRecTotal = DATA.length; } catch(_){}
   if (typeof window.__rbUpdateRecCount === 'function') window.__rbUpdateRecCount();
-  else document.getElementById('recCount').innerHTML = '<span class="dot"></span> '+fmt(DATA.length)+' registros';
+  else document.getElementById('recCount').innerHTML = '<span class="dot"></span> Atualizado em —';
 }
 
 /* v71: TAG DE REGISTROS — "N registros • Atualizado em dd/mm/aaaa às hh:mm"
@@ -4374,7 +4381,7 @@ function populateFilters(){
   function fmtData(ts){
     const d = new Date(ts);
     if (isNaN(d.getTime())) return '';
-    return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' às '+pad(d.getHours())+':'+pad(d.getMinutes());
+    return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(); // v72: somente a data
   }
   window.__rbSetImportFileDate = function(ts){
     const n = Number(ts);
@@ -4385,17 +4392,14 @@ function populateFilters(){
   window.__rbUpdateRecCount = function(){
     const el = document.getElementById('recCount');
     if (!el) return;
-    const total = (typeof window.__rbRecTotal === 'number') ? window.__rbRecTotal : null;
+    // v72: a tag mostra SOMENTE "Atualizado em dd/mm/aaaa" (sem total de registros e sem hora)
     let ts = null;
     try { ts = localStorage.getItem(KEY); } catch(_){}
     const dataTxt = ts ? fmtData(Number(ts)) : '';
-    let html = '<span class="dot"></span> ';
-    html += (total !== null ? (typeof fmt === 'function' ? fmt(total) : total)+' registros' : 'Carregando...');
-    if (dataTxt) html += ' <span class="rec-sep">•</span> Atualizado em '+dataTxt;
-    el.innerHTML = html;
+    el.innerHTML = '<span class="dot"></span> Atualizado em ' + (dataTxt || '—');
     el.title = dataTxt
-      ? 'Total de registros • Arquivo de importação salvo em '+dataTxt
-      : 'Total de registros (nenhum arquivo importado ainda)';
+      ? 'Arquivo de importação salvo em '+dataTxt
+      : 'Nenhum arquivo importado ainda — clique em Atualizar';
   };
   // Captura a data do arquivo em QUALQUER importação (manual ou automática),
   // antes dos handlers existentes — não altera o pipeline de importação.
@@ -13177,6 +13181,7 @@ window.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
