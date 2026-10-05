@@ -1886,6 +1886,14 @@
   @media (max-width:700px){
     .com-clientes-row .com-top-list{ grid-template-columns:1fr; }
   }
+  /* v73: linha Projeção no card Resultado */
+  .com-res-row .res-lbl small{ display:block; font-size:10.5px; font-weight:600; color:var(--text-soft); margin-top:2px; }
+  .com-res-row.res-proj .res-val{ color:#7c3aed; }
+  .com-res-row.res-proj .res-sub-ok{ color:#16a34a; font-weight:700; }
+  .com-res-row.res-proj .res-sub-bad{ color:#dc2626; font-weight:700; }
+  body.dark .com-res-row.res-proj .res-val{ color:#c4b5fd; }
+  body.dark .com-res-row.res-proj .res-sub-ok{ color:#4ade80; }
+  body.dark .com-res-row.res-proj .res-sub-bad{ color:#f87171; }
   body.dark .com-res-row{ border-color:#1e293b; }
   body.dark .com-res-row .res-lbl{ color:#e2e8f0; }
   body.dark .com-res-row .res-val{ color:#93c5fd; }
@@ -3588,6 +3596,7 @@ body.foods-empresa .com-comparativo-card .com-cmp-item .com-cmp-cur{ color:#b453
       <div class="com-resumo-rows">
         <div class="com-res-row"><span class="res-lbl">Valor Previsto</span><b class="res-val" id="comResPrevisto">R$ 0,00</b></div>
         <div class="com-res-row"><span class="res-lbl">Frete Total</span><b class="res-val" id="comResFrete">R$ 0,00</b></div>
+        <div class="com-res-row res-proj" id="comResProjRow" title="Realizado + média de frete por dia útil × dias úteis restantes"><span class="res-lbl">Projeção<small id="comResProjSub">—</small></span><b class="res-val" id="comResProj">—</b></div>
         <div class="com-res-row"><span class="res-lbl">Acumulado do Ano</span><b class="res-val" id="comResAcumulado">R$ 0,00</b></div>
       </div>
     </div>
@@ -3637,6 +3646,8 @@ body.foods-empresa .com-comparativo-card .com-cmp-item .com-cmp-cur{ color:#b453
       <canvas id="comRealizChart" height="110"></canvas>
       <div id="comRealizMesTooltip" class="com-chart-tooltip"></div>
     </div>
+    <!-- v73: legenda da linha de projeção -->
+    <div id="comRealizLegend" style="display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:11.5px;color:var(--text-soft);font-weight:600;"></div>
   </div>
 
   <!-- Card principal: clientes -->
@@ -10374,6 +10385,7 @@ loadInitialData();
     if(resPrevEl) resPrevEl.textContent = fmtBR(tPv);
     if(resFretEl) resFretEl.textContent = fmtBR(tF);
     if(resAcumEl) resAcumEl.textContent = fmtBR(tFAcum);
+    try{ renderProjecaoResultado(mes, emp, cliFiltro); }catch(_){}
 
     // v50: badge 'foods-empresa' no body para tematizar cards novos
     if(emp==='foods') document.body.classList.add('foods-empresa');
@@ -10892,21 +10904,130 @@ loadInitialData();
      mesNome: 'janeiro'...'dezembro' | emp: 'rodobras' | 'foods'
      Ano derivado do nome da aba (rodobras25/foods25 -> 2025); se não
      for possível derivar, usa o ano corrente. */
+  /* v75: ano de referência = ano corrente (as abas rodobras25/foods25 são só o nome
+     da fonte; os dados diários são do ano em curso). */
+  function anoDaAba(emp){ return (new Date()).getFullYear(); }
+
+  /* v75: feriados nacionais do Brasil (fixos + móveis a partir da Páscoa) */
+  const _feriadosCache = {};
+  function feriadosBR(ano){
+    if(_feriadosCache[ano]) return _feriadosCache[ano];
+    const set = new Set();
+    const add = (m,d)=> set.add(m+'-'+d);          // m: 0-11
+    [[0,1],[3,21],[4,1],[8,7],[9,12],[10,2],[10,15],[10,20],[11,25]].forEach(x=>add(x[0],x[1]));
+    // Páscoa (algoritmo de Meeus/Jones/Butcher)
+    const a=ano%19, b=Math.floor(ano/100), c=ano%100, d=Math.floor(b/4), e=b%4;
+    const f=Math.floor((b+8)/25), g=Math.floor((b-f+1)/3);
+    const h=(19*a+b-d-g+15)%30, i=Math.floor(c/4), k=c%4;
+    const l=(32+2*e+2*i-h-k)%7, m=Math.floor((a+11*h+22*l)/451);
+    const mes=Math.floor((h+l-7*m+114)/31)-1, dia=((h+l-7*m+114)%31)+1;
+    const pascoa = new Date(ano, mes, dia);
+    [-48,-47,-2,60].forEach(off=>{            // Carnaval (seg/ter), Sexta Santa, Corpus Christi
+      const dt = new Date(pascoa.getFullYear(), pascoa.getMonth(), pascoa.getDate()+off);
+      add(dt.getMonth(), dt.getDate());
+    });
+    return (_feriadosCache[ano] = set);
+  }
+  function isDiaUtil(ano, mesIdx, dia){
+    const dow = new Date(ano, mesIdx, dia).getDay();
+    if(dow===0 || dow===6) return false;
+    return !feriadosBR(ano).has(mesIdx+'-'+dia);
+  }
+
   function diasUteisDoMes(mesNome, emp){
     const mesIdx = MES_ORDEM.indexOf(mesNome);
     if(mesIdx < 0) return 0;
-    const abaNome = (emp==='foods') ? 'foods25' : 'rodobras25';
-    const mYear   = abaNome.match(/(\d{2,4})\s*$/);
-    const ano     = mYear
-      ? parseInt(mYear[1].length===2 ? ('20'+mYear[1]) : mYear[1], 10)
-      : (new Date()).getFullYear();
+    const ano      = anoDaAba(emp);
     const nDiasMes = new Date(ano, mesIdx+1, 0).getDate();
     let uteis = 0;
-    for(let d=1; d<=nDiasMes; d++){
-      const dow = new Date(ano, mesIdx, d).getDay(); // 0=dom, 6=sáb
-      if(dow !== 0 && dow !== 6) uteis++;
-    }
+    for(let d=1; d<=nDiasMes; d++) if(isDiaUtil(ano, mesIdx, d)) uteis++;
     return uteis;
+  }
+
+  /* v74: PROJEÇÃO do mês (apenas dias úteis, seg-sex):
+       média diária = frete realizado ÷ dias úteis já decorridos
+       projeção     = realizado + média diária × dias úteis que faltam (estimativa de fechamento)
+     Dia de corte ("hoje"):
+       • mês corrente (calendário real): hoje, se já houver emissão hoje; senão ontem
+         (o dia de hoje sem emissão não entra na média);
+       • demais meses: último dia com emissão no DIARIO.
+     Mês encerrado (nenhum dia útil faltando) ou sem dados diários → projeção = realizado. */
+  function projecaoMes(mesNome, emp, cliFiltro){
+    try{
+      const mesIdx = MES_ORDEM.indexOf(mesNome);
+      if(mesIdx < 0) return null;
+      const cd = getComData();
+      const ordem = cd.clientes_ordem || [];
+      const clisCalc = cliFiltro ? [cliFiltro] : ordem;
+      let fr=0, pv=0;
+      clisCalc.forEach(cli=>{
+        const r = calcRowCli(cli, mesNome, 'mes');
+        fr += r.frete||0; pv += r.previsto||0;
+      });
+      const diario = (emp==='foods')
+        ? ((typeof DIARIO_FOODS!=='undefined') ? DIARIO_FOODS : {})
+        : ((typeof DIARIO_RODOBRAS!=='undefined') ? DIARIO_RODOBRAS : {});
+      const clisDia = cliFiltro ? [cliFiltro] : Object.keys(diario);
+      let ultimo = 0;
+      clisDia.forEach(cli=>{
+        Object.keys(((diario[cli]||{})[mesNome])||{}).forEach(d=>{
+          const di = parseInt(d,10);
+          if(!isNaN(di) && di>ultimo) ultimo = di;
+        });
+      });
+      const ano      = anoDaAba(emp);
+      const nDiasMes = new Date(ano, mesIdx+1, 0).getDate();
+      const hoje     = new Date();
+      let corte = ultimo;
+      if(hoje.getFullYear()===ano && hoje.getMonth()===mesIdx){
+        const dh = hoje.getDate();
+        corte = (ultimo>=dh) ? dh : dh-1;
+      }
+      if(corte > nDiasMes) corte = nDiasMes;
+      let uteisDec = 0, uteisFalt = 0;
+      for(let d=1; d<=nDiasMes; d++){
+        if(!isDiaUtil(ano, mesIdx, d)) continue;
+        if(d<=corte) uteisDec++; else uteisFalt++;
+      }
+      const uteisTot = uteisDec + uteisFalt;
+      let proj = fr, completo = true;
+      if(ultimo>0 && uteisDec>0 && uteisFalt>0){
+        proj = fr + (fr/uteisDec) * uteisFalt;
+        completo = false;
+      }
+      return { mes:mesNome, frete:fr, previsto:pv, proj:proj, uteisDec:uteisDec,
+               uteisFalt:uteisFalt, uteisTot:uteisTot, ultimoDia:ultimo, completo:completo,
+               pct: pv>0 ? proj/pv*100 : null };
+    }catch(_){ return null; }
+  }
+
+  /* v73: preenche a linha Projeção do card Resultado */
+  function renderProjecaoResultado(mesSel, emp, cliFiltro){
+    const vEl = document.getElementById('comResProj');
+    const sEl = document.getElementById('comResProjSub');
+    if(!vEl || !sEl) return;
+    const cd = getComData();
+    const disp = (cd.meses_disponiveis||[]).slice()
+      .sort((a,b)=> MES_ORDEM.indexOf(a)-MES_ORDEM.indexOf(b));
+    const m = mesSel || disp[disp.length-1] || '';
+    const pj = m ? projecaoMes(m, emp, cliFiltro) : null;
+    if(!pj){ vEl.textContent='—'; sEl.textContent='—'; sEl.className=''; return; }
+    vEl.textContent = fmtBR(pj.proj);
+    const base = capitalize(m);
+    if(pj.previsto > 0){
+      const diff = pj.proj - pj.previsto;
+      const pct  = Math.abs(diff/pj.previsto*100).toFixed(1).replace('.',',');
+      const acima = diff >= 0;
+      sEl.className = acima ? 'res-sub-ok' : 'res-sub-bad';
+      sEl.textContent = base + ' • ' + (acima?'▲ ':'▼ ') + fmtBR(Math.abs(diff)) + ' (' + pct + '%)';
+    } else {
+      sEl.className = '';
+      sEl.textContent = base + ' • sem previsto';
+    }
+    const row = document.getElementById('comResProjRow');
+    if(row) row.title = pj.completo
+      ? 'Mês encerrado: projeção = realizado'
+      : ('Realizado + (frete ÷ '+pj.uteisDec+' dias úteis decorridos) × '+pj.uteisFalt+' dias úteis restantes');
   }
 
   function renderRealizDiaChart(){
@@ -11400,6 +11521,26 @@ loadInitialData();
       previstos.push(pv);
       return pv>0 ? (fr/pv*100) : 0;
     });
+    /* v73: projeção por mês (média por dia útil × dias úteis do mês) */
+    const empProj = getEmpresa();
+    const projs = disp.map((m,i)=>{
+      const pj = projecaoMes(m, empProj, cliFiltroChart);
+      return pj || { proj:fretes[i], completo:true, previsto:previstos[i], uteisDec:0, uteisFalt:0, uteisTot:0 };
+    });
+    const projVals = projs.map((pj,i)=> previstos[i]>0 ? (pj.proj/previstos[i]*100) : 0);
+    const temProj  = projs.some(pj=>!pj.completo);
+
+    /* v73: legenda da projeção */
+    try{
+      const lg = document.getElementById('comRealizLegend');
+      if(lg){
+        const pc = document.body.classList.contains('dark') ? '#c4b5fd' : '#7c3aed';
+        lg.innerHTML = temProj
+          ? '<span style="display:inline-flex;align-items:center;gap:6px;"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="'+pc+'" stroke-width="2.2" stroke-dasharray="6 4"/></svg>Projeção (realizado + média por dia útil × dias úteis restantes)</span>'
+          : '';
+        lg.style.display = temProj ? 'flex' : 'none';
+      }
+    }catch(_){}
 
     /* v59: subtítulo do card informa o escopo exibido */
     try{
@@ -11444,7 +11585,7 @@ loadInitialData();
     const plotH = H - pad.top - pad.bottom;
 
     // Escala Y: 0..max( max(values)*1.15, 100 )
-    const maxVal = Math.max(100, ...values, 0);
+    const maxVal = Math.max(100, ...values, ...projVals, 0);
     const yMax   = Math.ceil((maxVal*1.10)/10)*10;
     const yMin   = 0;
     const yTicks = 5;
@@ -11522,6 +11663,23 @@ loadInitialData();
     }
     ctx.stroke();
 
+    // v73: linha tracejada de PROJEÇÃO
+    const projColor = dark ? '#c4b5fd' : '#7c3aed';
+    if(temProj){
+      ctx.save();
+      ctx.setLineDash([7,5]);
+      ctx.strokeStyle = projColor;
+      ctx.lineWidth = 2.2;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for(let i=0;i<n;i++){
+        const x = xFor(i), y = yFor(projVals[i]);
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Pontos + rótulos
     ctx.font = '11px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
     ctx.textBaseline = 'middle';
@@ -11537,7 +11695,21 @@ loadInitialData();
       const lbl = values[i].toFixed(1).replace('.',',')+'%';
       ctx.fillStyle = textColor;
       ctx.textAlign = 'center';
-      ctx.fillText(lbl, x, y-14);
+      const pjI = projs[i];
+      if(temProj && !pjI.completo){
+        const yp = yFor(projVals[i]);
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(x, yp, 5.5, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = projColor; ctx.lineWidth = 2.2;
+        ctx.beginPath(); ctx.arc(x, yp, 4, 0, Math.PI*2); ctx.stroke();
+        ctx.fillStyle = projColor;
+        ctx.font = 'bold 11px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        const acima = yp <= y;
+        ctx.fillText('Proj. '+projVals[i].toFixed(1).replace('.',',')+'%', x, acima ? yp-14 : yp+16);
+        ctx.restore();
+      }
     }
 
     // Labels X
@@ -11599,7 +11771,17 @@ loadInitialData();
               '<span class="ctt-dot" style="background:transparent;border:1.5px dashed '+lineColor+'"></span>' +
               '<span>Previsto:</span>' +
               '<span class="ctt-val">'+ fmtBR(previstos[bestI]) +'</span>' +
-            '</div>';
+            '</div>' +
+            (!projs[bestI].completo ?
+              '<div class="ctt-row">'+
+                '<span class="ctt-dot" style="background:transparent;border:1.5px dashed '+projColor+'"></span>' +
+                '<span>Projeção:</span>' +
+                '<span class="ctt-val">'+ fmtBR(projs[bestI].proj) +'</span>' +
+                '<span class="ctt-pct">'+ projVals[bestI].toFixed(1).replace('.',',') +'%</span>' +
+              '</div>' +
+              '<div class="ctt-row" style="opacity:.8;font-size:10.5px;">'+
+                '<span>'+ projs[bestI].uteisDec +' de '+ projs[bestI].uteisTot +' dias úteis decorridos</span>' +
+              '</div>' : '');
           tooltip.innerHTML = html;
           tooltip.style.left = px + 'px';
           tooltip.style.top  = (py - 8) + 'px';
